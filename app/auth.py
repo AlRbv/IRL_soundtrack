@@ -40,6 +40,7 @@ def clinet_headers() -> dict:
         "Authorization": "Basic " + auth_base64,
         "Content-Type": "application/x-www-form-urlencoded", 
     }
+    return headers
 
 def get_tokens_from_code(code: str) -> dict:
     headers = clinet_headers()
