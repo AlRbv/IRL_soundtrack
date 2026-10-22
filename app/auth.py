@@ -4,6 +4,8 @@ import json
 import time
 from pathlib import Path
 import secrets
+import webbrowser
+
 from urllib.parse import urlencode, parse_qs, urlparse
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -32,12 +34,15 @@ def build_auth_url() -> tuple[str, str]:
     }
     return "https://accounts.spotify.com/authorize?" + urlencode(params), state
 
-def get_tokens_from_code(code: str) -> dict:
+def clinet_headers() -> dict:
     auth_base64 = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode("utf-8")).decode("utf-8")
     headers = {
         "Authorization": "Basic " + auth_base64,
         "Content-Type": "application/x-www-form-urlencoded", 
     }
+
+def get_tokens_from_code(code: str) -> dict:
+    headers = clinet_headers()
     data = {"grant_type": "authorization_code","code": code, "redirect_uri": REDIRECT_URI}
 
     result = post("https://accounts.spotify.com/api/token", headers=headers, data=data)
@@ -98,4 +103,31 @@ def load_tokens() -> dict | None:
         print(f"Token cache unreadable, ignoring: {TOKEN_PATH}")
         return None
     
+def refresh_tokens(refresh_token: str) -> dict | None:
+    data = {"grant_type": "refresh_token", "refresh_token": refresh_token}
+    result = post("https://accounts.spotify.com/api/token", headers=clinet_headers(), data=data)
 
+    if result.status_code == 400:
+        print(f"Refresh token rejected, new login needed {result.text}")
+        return None
+    if not result.ok:
+        raise SystemExit(f"Token refresh failed - {result.status_code} {result.text}")
+
+    return {"refresh_token": refresh_token, **result.json()}
+
+def get_access_token() -> str:
+    tokens = load_tokens()
+
+    if tokens and tokens["expires_at"] - 60 > time.time():
+        return tokens["access_token"]
+
+    if tokens and "refresh_token" in tokens:
+        refreshed = refresh_tokens(tokens["refresh_token"])
+        if refreshed:
+            return save_tokens(refreshed)["access_token"]
+
+    url, state = build_auth_url()
+    print("Opening Spotify login in your browser...")
+    webbrowser.open(url)
+    code = wait_for_server_callback(state, timeout=120)
+    return save_tokens(get_tokens_from_code(code))["access_token"]
