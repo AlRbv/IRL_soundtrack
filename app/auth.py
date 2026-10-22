@@ -1,5 +1,8 @@
 import base64
 import os
+import json
+import time
+from pathlib import Path
 import secrets
 from urllib.parse import urlencode, parse_qs, urlparse
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -12,6 +15,7 @@ load_dotenv()
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 REDIRECT_URI = "http://127.0.0.1:8888/callback"
+TOKEN_PATH = Path(__file__).resolve().parent.parent / ".cache" / "spotify_token.json"
 SCOPE = "user-library-read user-modify-playback-state"
 
 if not CLIENT_ID or not CLIENT_SECRET:
@@ -77,4 +81,21 @@ def wait_for_server_callback(expected_state: str, timeout: int = 20) -> str:
         raise SystemExit("Redirect had no code. Try again")
 
     return result["code"]
+
+def save_tokens(tokens: dict) -> dict:
+    tokens = {**tokens, "expires_at": int(time.time()) + tokens["expires_in"]}
+    TOKEN_PATH.parent.mkdir(exist_ok=True)
+    TOKEN_PATH.write_text(json.dumps(tokens, indent=2), encoding="utf-8")
+    TOKEN_PATH.chmod(0o600)
+    return tokens
+
+def load_tokens() -> dict | None:
+    if not TOKEN_PATH.exists():
+        return None
+    try:
+        return json.loads(TOKEN_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        print(f"Token cache unreadable, ignoring: {TOKEN_PATH}")
+        return None
+    
 
