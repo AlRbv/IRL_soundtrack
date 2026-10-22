@@ -1,7 +1,8 @@
 import base64
 import os
 import secrets
-from urllib.parse import urlencode
+from urllib.parse import urlencode, parse_qs, urlparse
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from dotenv import load_dotenv
 from requests import post
@@ -41,3 +42,39 @@ def get_tokens_from_code(code: str) -> dict:
         raise SystemExit(f"Token wasn't fecthed - {result.status_code} {result.text}")
     
     return result.json()
+
+
+def wait_for_server_callback(expected_state: str, timeout: int = 20) -> str:
+    result = {}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            query = parse_qs(urlparse(self.path).query)
+            for key in ("code", "state", "error"):
+                if key in query:
+                    result[key] = query[key][0]
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"Login received. You can close the tab.")
+
+        def log_message(self, format, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", urlparse(REDIRECT_URI).port), Handler)
+
+    server.timeout = timeout
+    server.handle_request()
+    server.server_close()
+
+    if not result:
+        raise SystemExit("Nothing sent from spotify. Timeout")
+    if "error" in result: 
+        raise SystemExit(f"Login failed {result["error"]}")
+    if result.get("state") != expected_state:
+        raise SystemExit("Failed to confirm user. Suspicious acitivity on login.")
+    if "code" not in result:
+        raise SystemExit("Redirect had no code. Try again")
+
+    return result["code"]
+
