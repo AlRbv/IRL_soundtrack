@@ -1,6 +1,7 @@
 import sys
 
 from app.auth import get_access_token
+from app.get_saved import print_fetched_tracks, fetch_saved_tracks
 
 
 def main() -> int:
@@ -14,6 +15,7 @@ def main() -> int:
     print("STATUS:OK")
     return 0
 
+print_fetched_tracks(fetch_saved_tracks(get_access_token()))
 
 if __name__ == "__main__":
     sys.exit(main())
