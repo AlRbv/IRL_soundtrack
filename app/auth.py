@@ -18,7 +18,7 @@ CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 REDIRECT_URI = "http://127.0.0.1:8888/callback"
 TOKEN_PATH = Path(__file__).resolve().parent.parent / ".cache" / "spotify_token.json"
-SCOPE = "user-library-read user-modify-playback-state"
+SCOPE = "user-library-read user-modify-playback-state playlist-read-private"
 
 if not CLIENT_ID or not CLIENT_SECRET:
     raise SystemExit("client id/secret not found in .env")
@@ -116,8 +116,17 @@ def refresh_tokens(refresh_token: str) -> dict | None:
 
     return {"refresh_token": refresh_token, **result.json()}
 
+def has_all_scopes(tokens: dict) -> bool:
+    required = set(SCOPE.split())
+    granted = set(tokens.get("scope", "").split())
+    return required <= granted
+
 def get_access_token() -> str:
     tokens = load_tokens()
+
+    if tokens and not has_all_scopes(tokens):
+        print("Scopes needed changed, new loging needed")
+        tokens = None
 
     if tokens and tokens["expires_at"] - 60 > time.time():
         return tokens["access_token"]
