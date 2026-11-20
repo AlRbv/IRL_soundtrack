@@ -18,7 +18,7 @@ CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 REDIRECT_URI = "http://127.0.0.1:8888/callback"
 TOKEN_PATH = Path(__file__).resolve().parent.parent / ".cache" / "spotify_token.json"
-SCOPE = "user-library-read user-modify-playback-state playlist-read-private"
+SCOPE = "user-library-read user-modify-playback-state playlist-read-private user-read-currently-playing"
 
 if not CLIENT_ID or not CLIENT_SECRET:
     raise SystemExit("client id/secret not found in .env")
